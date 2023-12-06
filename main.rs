@@ -2,6 +2,7 @@ use rayon::prelude::*;
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 type Maze = Vec<Vec<char>>;
 
@@ -10,18 +11,33 @@ struct SharedState {
     visited: HashSet<(usize, usize)>,
     queue: VecDeque<(usize, usize)>,
     parents: Vec<Vec<Option<(usize, usize)>>>,
+    //goal_reached: bool //goal_reached flag
+}
+
+impl SharedState {
+    fn new(rows: usize, cols: usize) -> Self {
+        SharedState {
+            visited: HashSet::new(),
+            queue: VecDeque::new(),
+            parents: vec![vec![None; cols]; rows],
+        }
+    }
 }
 
 fn bfs_worker(
     maze: Arc<Maze>,
-    state: Arc<Mutex<SharedState>>,
+    state: Arc<(Mutex<SharedState>, AtomicBool)>,
     start: (usize, usize),
     goal: (usize, usize),
     id: usize,
 ) -> Option<Vec<(usize, usize)>> {
     loop {
+        let (state_lock, goal_reached) = &*state;
         let cell = {
-            let mut state = state.lock().unwrap();
+            let mut state = state_lock.lock().unwrap();
+            if goal_reached.load(Ordering::Relaxed) {
+                return None; // Stop processing if the goal is reached
+            }
             state.queue.pop_front()
         };
 
@@ -29,12 +45,13 @@ fn bfs_worker(
             Some(current_cell) => {
                 if current_cell == goal {
                     println!("Thread {}: Goal reached!", id);
-                    return Some(retrieve_shortest_path(&state, start, goal));
+                    goal_reached.store(true, Ordering::Relaxed);
+                    return Some(retrieve_shortest_path(&state_lock, start, goal));
                 }
 
                 if let Some(neighbors) = get_neighbors(&maze, current_cell) {
                     for neighbor in neighbors {
-                        let mut state = state.lock().unwrap();
+                        let mut state = state_lock.lock().unwrap();
                         if state.visited.insert(neighbor) {
                             state.queue.push_back(neighbor);
                             state.parents[neighbor.0][neighbor.1] = Some(current_cell);
@@ -99,13 +116,12 @@ fn retrieve_shortest_path(
 fn parallel_bfs(maze: &Maze, start: (usize, usize), goal: (usize, usize)) -> Option<Vec<(usize, usize)>> {
     let num_threads = 6;
     let maze = Arc::new(maze.clone());
-    let state = Arc::new(Mutex::new(SharedState {
-        visited: HashSet::new(),
-        queue: VecDeque::new(),
-        parents: vec![vec![None; maze[0].len()]; maze.len()],
-    }));
+    let state = Arc::new((
+        Mutex::new(SharedState::new(maze.len(), maze[0].len())),
+        AtomicBool::new(false),
+    ));
 
-    state.lock().unwrap().queue.push_back(start);
+    state.0.lock().unwrap().queue.push_back(start);
 
     let mut handles = vec![];
 
@@ -154,5 +170,6 @@ fn main() {
 /*
 //make other threads stop once goal reached
 In parallel: convert path to maze parallel using par iter rayon
+making a solution vector using parallel
 
 */
