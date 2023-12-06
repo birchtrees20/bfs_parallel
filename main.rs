@@ -49,7 +49,7 @@ fn bfs_worker(
                     return Some(retrieve_shortest_path(&state_lock, start, goal));
                 }
 
-                if let Some(neighbors) = get_neighbors(&maze, current_cell) {
+                if let Some(neighbors) = get_neighbors(&maze, current_cell, goal_reached) {
                     for neighbor in neighbors {
                         let mut state = state_lock.lock().unwrap();
                         if state.visited.insert(neighbor) {
@@ -68,7 +68,16 @@ fn bfs_worker(
     None
 }
 
-fn get_neighbors(maze: &Maze, cell: (usize, usize)) -> Option<Vec<(usize, usize)>> {
+fn get_neighbors(
+    maze: &Maze,
+    cell: (usize, usize),
+    goal_reached: &AtomicBool,
+) -> Option<Vec<(usize, usize)>> {
+    // Check if the goal is reached, and if so, return early
+    if goal_reached.load(Ordering::Relaxed) {
+        return None;
+    }
+
     let (row, col) = cell;
     let mut neighbors = Vec::new();
 
@@ -76,10 +85,7 @@ fn get_neighbors(maze: &Maze, cell: (usize, usize)) -> Option<Vec<(usize, usize)
         let new_row = row.wrapping_add(dr as usize);
         let new_col = col.wrapping_add(dc as usize);
 
-        if new_row < maze.len()
-            && new_col < maze[0].len()
-            && maze[new_row][new_col] != '#'
-        {
+        if new_row < maze.len() && new_col < maze[0].len() && maze[new_row][new_col] != '#' {
             neighbors.push((new_row, new_col));
         }
     }
