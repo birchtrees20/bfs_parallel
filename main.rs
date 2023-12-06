@@ -97,7 +97,7 @@ fn retrieve_shortest_path(
 }
 
 fn parallel_bfs(maze: &Maze, start: (usize, usize), goal: (usize, usize)) -> Option<Vec<(usize, usize)>> {
-    let num_threads = 4;
+    let num_threads = 6;
     let maze = Arc::new(maze.clone());
     let state = Arc::new(Mutex::new(SharedState {
         visited: HashSet::new(),
@@ -135,12 +135,12 @@ fn main() {
         vec!['.', '#', '.', '.', '.', '.', '.'],
         vec!['.', '#', '.', '#', '#', '#', '.'],
         vec!['.', '#', '.', '.', '.', '#', '.'],
-        vec!['.', '#', '#', '#', '#', '#', '.'],
+        vec!['.', '#', '#', '#', '.', '#', '.'],
         vec!['.', '.', '.', '.', '.', '#', '.'],
         vec!['#', '#', '#', '#', '.', '#', '.'],
-        vec!['.', '.', '.', '.', '.', '.', '.'],
+        vec!['.', '.', '.', '.', '.', '#', '.'],
     ];
-
+    
     let start = (0, 0);
     let goal = (6, 6);
 
@@ -150,3 +150,9 @@ fn main() {
         println!("No path found");
     }
 }
+
+/*
+//make other threads stop once goal reached
+In parallel: convert path to maze parallel using par iter rayon
+
+*/
